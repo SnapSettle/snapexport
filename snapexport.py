@@ -1,5 +1,6 @@
 import os
 import subprocess
+import shutil
 import inkex
 
 
@@ -29,7 +30,7 @@ class SnapExport(inkex.EffectExtension):
         success_list = []
         info_notes = []
 
-        # Process Standard Formats (PNG, PDF, EPS)
+        # Process Base Formats (PNG, PDF, EPS)
         standard_formats = {
             "png": self.options.do_png,
             "pdf": self.options.do_pdf,
@@ -47,9 +48,77 @@ class SnapExport(inkex.EffectExtension):
                 except subprocess.CalledProcessError:
                     pass
 
-        # Process JPEG natively
+        # Process Native Inkscape SVG (Direct file copy of your project file)
+        if self.options.do_svg_inkscape:
+            inkscape_svg_name = f"{base_name}_inkscape.svg" if (self.options.do_svg_plain or self.options.do_svg_optimized) else f"{base_name}.svg"
+            inkscape_svg_path = os.path.join(output_dir, inkscape_svg_name)
+            try:
+                shutil.copy2(svg_file, inkscape_svg_path)
+                success_list.append(inkscape_svg_name)
+            except Exception:
+                pass
+
+        # Process Plain SVG (Inkscape can reliably clean metadata natively)
+        plain_svg_name = f"{base_name}_plain.svg" if (self.options.do_svg_inkscape or self.options.do_svg_optimized) else f"{base_name}.svg"
+        plain_svg_path = os.path.join(output_dir, plain_svg_name)
+        
+        # We always build an intermediate plain vector if an optimized one is requested to feed into Tier 2 scour later
+        if self.options.do_svg_plain or self.options.do_svg_optimized:
+            command = ["inkscape", svg_file, "--export-type=svg", "--export-extension=org.inkscape.output.svg.plain", "-o", plain_svg_path]
+            try:
+                subprocess.run(command, check=True, capture_output=True, text=True)
+                if os.path.exists(plain_svg_path) and self.options.do_svg_plain:
+                    success_list.append(plain_svg_name)
+            except subprocess.CalledProcessError:
+                pass
+
+        # Process Optimized SVG (Tier 1: Native Extension -> Tier 2: Direct Command)
+        if self.options.do_svg_optimized:
+            opt_svg_name = f"{base_name}_optimized.svg" if (self.options.do_svg_plain or self.options.do_svg_inkscape) else f"{base_name}.svg"
+            opt_svg_path = os.path.join(output_dir, opt_svg_name)
+            opt_success = False
+
+            # Tier 1: Try Native Inkscape Optimized Extension Channel
+            command = ["inkscape", svg_file, "--export-type=svg", "--export-extension=org.inkscape.output.scour.inkscape", "-o", opt_svg_path]
+            try:
+                subprocess.run(command, check=True, capture_output=True, text=True)
+                if os.path.exists(opt_svg_path):
+                    success_list.append(opt_svg_name)
+                    opt_success = True
+            except subprocess.CalledProcessError:
+                pass
+
+            # Tier 2: If Tier 1 skipped, bypass Sandbox and try calling the system 'scour' directly
+            if not opt_success:
+                if os.path.exists(plain_svg_path) and shutil.which("scour"):
+                    scour_cmd = ["scour", "-i", plain_svg_path, "-o", opt_svg_path, "--enable-viewboxing"]
+                    try:
+                        subprocess.run(scour_cmd, check=True, capture_output=True, text=True)
+                        if os.path.exists(opt_svg_path):
+                            success_list.append(opt_svg_name)
+                            opt_success = True
+                    except subprocess.CalledProcessError:
+                        pass
+
+            # Tier 3: Notify the user if both methods completely failed
+            if not opt_success:
+                info_notes.append("⚠️  Optimized SVG Skipped:")
+                info_notes.append("   The 'Scour' code-cleaner utility is missing or cannot be reached.")
+                info_notes.append("   👉 Fix: Export as 'Plain SVG' or make sure 'scour' is accessible.")
+
+            # Housekeeping: Remove intermediate vector file if plain wasn't requested by the user interface
+            if not self.options.do_svg_plain and os.path.exists(plain_svg_path):
+                try:
+                    os.remove(plain_svg_path)
+                except OSError:
+                    pass
+
+        # Process JPEG (Tier 1: Native Export -> Tier 2: ImageMagick Conversion)
         if self.options.do_jpg:
             jpg_path = os.path.join(output_dir, f"{base_name}.jpg")
+            jpg_success = False
+
+            # Tier 1: Try Native Inkscape JPG Render Engine
             command = [
                 "inkscape",
                 svg_file,
@@ -62,47 +131,52 @@ class SnapExport(inkex.EffectExtension):
                 subprocess.run(command, check=True, capture_output=True, text=True)
                 if os.path.exists(jpg_path):
                     success_list.append(f"{base_name}.jpg")
-                else:
-                    raise FileNotFoundError
-            except (subprocess.CalledProcessError, FileNotFoundError):
+                    jpg_success = True
+            except subprocess.CalledProcessError:
+                pass
+
+            # Tier 2: If Tier 1 skipped, bypass Sandbox and convert using direct ImageMagick calls
+            if not jpg_success:
+                png_source = os.path.join(output_dir, f"{base_name}.png")
+                temp_png_created = False
+
+                # Ensure we have a high quality PNG to compress from
+                if not os.path.exists(png_source):
+                    command = ["inkscape", svg_file, "--export-background=ffffff", "-o", png_source]
+                    try:
+                        subprocess.run(command, check=True, capture_output=True, text=True)
+                        temp_png_created = os.path.exists(png_source)
+                    except subprocess.CalledProcessError:
+                        pass
+
+                # Locate active system binary variant name
+                im_binary = "magick" if shutil.which("magick") else ("convert" if shutil.which("convert") else None)
+
+                if os.path.exists(png_source) and im_binary:
+                    img_cmd = [im_binary, png_source, "-background", "white", "-alpha", "remove", jpg_path]
+                    try:
+                        subprocess.run(img_cmd, check=True, capture_output=True, text=True)
+                        if os.path.exists(jpg_path):
+                            success_list.append(f"{base_name}.jpg")
+                            jpg_success = True
+                    except subprocess.CalledProcessError:
+                        pass
+
+                # Housekeeping: Remove the temporary raster asset if it wasn't requested by user options
+                if temp_png_created and os.path.exists(png_source):
+                    try:
+                        os.remove(png_source)
+                    except OSError:
+                        pass
+
+            # Tier 3: Warn the user if both execution channels failed to build a file
+            if not jpg_success:
                 info_notes.append("⚠️  JPEG File Skipped:")
                 info_notes.append("   Your system is missing a conversion tool (ImageMagick).")
                 info_notes.append("   👉 Fix: Use File -> Export... -> JPG inside Inkscape,")
                 info_notes.append("           or convert your generated PNG into a JPEG.")
 
-        # Process SVG Variants natively
-        svg_variants = []
-        if self.options.do_svg_plain:
-            svg_variants.append(("org.inkscape.output.svg.plain", "plain"))
-        if self.options.do_svg_inkscape:
-            svg_variants.append((None, "inkscape"))
-        if self.options.do_svg_optimized:
-            svg_variants.append(("org.inkscape.output.scour.inkscape", "optimized"))
-
-        use_suffix = len(svg_variants) > 1
-
-        for extension_id, suffix in svg_variants:
-            target_filename = f"{base_name}_{suffix}.svg" if use_suffix else f"{base_name}.svg"
-            out_path = os.path.join(output_dir, target_filename)
-
-            command = ["inkscape", svg_file, "--export-type=svg", "-o", out_path]
-            if extension_id:
-                command.append(f"--export-extension={extension_id}")
-
-            try:
-                subprocess.run(command, check=True, capture_output=True, text=True)
-                if os.path.exists(out_path):
-                    success_list.append(target_filename)
-                else:
-                    raise FileNotFoundError
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                if suffix == "optimized":
-                    info_notes.append("⚠️  Optimized SVG Skipped:")
-                    info_notes.append("   The 'Scour' code-cleaner utility is missing.")
-                    info_notes.append("   👉 Fix 1: Export as 'Plain SVG' instead.")
-                    info_notes.append("   👉 Fix 2: Install the 'Scour' utility in your system.")
-
-        # Construct Clean Layout Dialog Report
+        # 6. Construct Clean Layout Dialog Report
         log_output = []
         divider = "─" * 45
 
