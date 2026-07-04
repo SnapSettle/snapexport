@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension" needs-live-preview="false">
+    <name>SnapExport</name>
+    <id>org.snapsettle.export</id>
+    
+    <param name="path" type="path" mode="folder" gui-text="Select Output Directory:">/tmp/snapexport</param>
+    <param name="filename" type="string" gui-text="Base Filename:">illustration</param>
+    
+    <separator/>
+    <label>Select formats to export simultaneously:</label>
+    
+    <label font-weight="bold">SVG Options:</label>
+    <param name="do_svg_plain" type="bool" gui-text="➔ Plain SVG">false</param>
+    <param name="do_svg_inkscape" type="bool" gui-text="➔ Inkscape SVG">false</param>
+    <param name="do_svg_optimized" type="bool" gui-text="➔ Optimized SVG">true</param>
+   
+    <separator/>
+    <label font-weight="bold">Other Formats:</label>
+    <param name="do_png" type="bool" gui-text="PNG">true</param>
+    <param name="do_jpg" type="bool" gui-text="JPEG">true</param>
+    <param name="do_pdf" type="bool" gui-text="PDF">true</param>
+    <param name="do_eps" type="bool" gui-text="EPS">true</param>
+
+    <effect>
+        <object-type>all</object-type>
+        <effects-menu>
+            <submenu name="Export"/>
+        </effects-menu>
+    </effect>
+    <script>
+        <command location="inx" interpreter="python">snapexport.py</command>
+    </script>
+</inkscape-extension>
