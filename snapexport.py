@@ -50,7 +50,11 @@ class SnapExport(inkex.EffectExtension):
 
         # Process Native Inkscape SVG (Direct file copy of your project file)
         if self.options.do_svg_inkscape:
-            inkscape_svg_name = f"{base_name}_inkscape.svg" if (self.options.do_svg_plain or self.options.do_svg_optimized) else f"{base_name}.svg"
+            inkscape_svg_name = (
+                f"{base_name}_inkscape.svg"
+                if (self.options.do_svg_plain or self.options.do_svg_optimized)
+                else f"{base_name}.svg"
+            )
             inkscape_svg_path = os.path.join(output_dir, inkscape_svg_name)
             try:
                 shutil.copy2(svg_file, inkscape_svg_path)
@@ -59,12 +63,23 @@ class SnapExport(inkex.EffectExtension):
                 pass
 
         # Process Plain SVG (Inkscape can reliably clean metadata natively)
-        plain_svg_name = f"{base_name}_plain.svg" if (self.options.do_svg_inkscape or self.options.do_svg_optimized) else f"{base_name}.svg"
+        plain_svg_name = (
+            f"{base_name}_plain.svg"
+            if (self.options.do_svg_inkscape or self.options.do_svg_optimized)
+            else f"{base_name}.svg"
+        )
         plain_svg_path = os.path.join(output_dir, plain_svg_name)
-        
+
         # We always build an intermediate plain vector if an optimized one is requested to feed into Tier 2 scour later
         if self.options.do_svg_plain or self.options.do_svg_optimized:
-            command = ["inkscape", svg_file, "--export-type=svg", "--export-extension=org.inkscape.output.svg.plain", "-o", plain_svg_path]
+            command = [
+                "inkscape",
+                svg_file,
+                "--export-type=svg",
+                "--export-extension=org.inkscape.output.svg.plain",
+                "-o",
+                plain_svg_path,
+            ]
             try:
                 subprocess.run(command, check=True, capture_output=True, text=True)
                 if os.path.exists(plain_svg_path) and self.options.do_svg_plain:
@@ -74,12 +89,23 @@ class SnapExport(inkex.EffectExtension):
 
         # Process Optimized SVG (Tier 1: Native Extension -> Tier 2: Direct Command)
         if self.options.do_svg_optimized:
-            opt_svg_name = f"{base_name}_optimized.svg" if (self.options.do_svg_plain or self.options.do_svg_inkscape) else f"{base_name}.svg"
+            opt_svg_name = (
+                f"{base_name}_optimized.svg"
+                if (self.options.do_svg_plain or self.options.do_svg_inkscape)
+                else f"{base_name}.svg"
+            )
             opt_svg_path = os.path.join(output_dir, opt_svg_name)
             opt_success = False
 
             # Tier 1: Try Native Inkscape Optimized Extension Channel
-            command = ["inkscape", svg_file, "--export-type=svg", "--export-extension=org.inkscape.output.scour.inkscape", "-o", opt_svg_path]
+            command = [
+                "inkscape",
+                svg_file,
+                "--export-type=svg",
+                "--export-extension=org.inkscape.output.scour.inkscape",
+                "-o",
+                opt_svg_path,
+            ]
             try:
                 subprocess.run(command, check=True, capture_output=True, text=True)
                 if os.path.exists(opt_svg_path):
@@ -91,9 +117,18 @@ class SnapExport(inkex.EffectExtension):
             # Tier 2: If Tier 1 skipped, bypass Sandbox and try calling the system 'scour' directly
             if not opt_success:
                 if os.path.exists(plain_svg_path) and shutil.which("scour"):
-                    scour_cmd = ["scour", "-i", plain_svg_path, "-o", opt_svg_path, "--enable-viewboxing"]
+                    scour_cmd = [
+                        "scour",
+                        "-i",
+                        plain_svg_path,
+                        "-o",
+                        opt_svg_path,
+                        "--enable-viewboxing",
+                    ]
                     try:
-                        subprocess.run(scour_cmd, check=True, capture_output=True, text=True)
+                        subprocess.run(
+                            scour_cmd, check=True, capture_output=True, text=True
+                        )
                         if os.path.exists(opt_svg_path):
                             success_list.append(opt_svg_name)
                             opt_success = True
@@ -103,8 +138,12 @@ class SnapExport(inkex.EffectExtension):
             # Tier 3: Notify the user if both methods completely failed
             if not opt_success:
                 info_notes.append("⚠️  Optimized SVG Skipped:")
-                info_notes.append("   The 'Scour' code-cleaner utility is missing or cannot be reached.")
-                info_notes.append("   👉 Fix: Export as 'Plain SVG' or make sure 'scour' is accessible.")
+                info_notes.append(
+                    "   The 'Scour' code-cleaner utility is missing or cannot be reached."
+                )
+                info_notes.append(
+                    "   👉 Fix: Export as 'Plain SVG' or make sure 'scour' is accessible."
+                )
 
             # Housekeeping: Remove intermediate vector file if plain wasn't requested by the user interface
             if not self.options.do_svg_plain and os.path.exists(plain_svg_path):
@@ -142,20 +181,42 @@ class SnapExport(inkex.EffectExtension):
 
                 # Ensure we have a high quality PNG to compress from
                 if not os.path.exists(png_source):
-                    command = ["inkscape", svg_file, "--export-background=ffffff", "-o", png_source]
+                    command = [
+                        "inkscape",
+                        svg_file,
+                        "--export-background=ffffff",
+                        "-o",
+                        png_source,
+                    ]
                     try:
-                        subprocess.run(command, check=True, capture_output=True, text=True)
+                        subprocess.run(
+                            command, check=True, capture_output=True, text=True
+                        )
                         temp_png_created = os.path.exists(png_source)
                     except subprocess.CalledProcessError:
                         pass
 
                 # Locate active system binary variant name
-                im_binary = "magick" if shutil.which("magick") else ("convert" if shutil.which("convert") else None)
+                im_binary = (
+                    "magick"
+                    if shutil.which("magick")
+                    else ("convert" if shutil.which("convert") else None)
+                )
 
                 if os.path.exists(png_source) and im_binary:
-                    img_cmd = [im_binary, png_source, "-background", "white", "-alpha", "remove", jpg_path]
+                    img_cmd = [
+                        im_binary,
+                        png_source,
+                        "-background",
+                        "white",
+                        "-alpha",
+                        "remove",
+                        jpg_path,
+                    ]
                     try:
-                        subprocess.run(img_cmd, check=True, capture_output=True, text=True)
+                        subprocess.run(
+                            img_cmd, check=True, capture_output=True, text=True
+                        )
                         if os.path.exists(jpg_path):
                             success_list.append(f"{base_name}.jpg")
                             jpg_success = True
@@ -172,9 +233,15 @@ class SnapExport(inkex.EffectExtension):
             # Tier 3: Warn the user if both execution channels failed to build a file
             if not jpg_success:
                 info_notes.append("⚠️  JPEG File Skipped:")
-                info_notes.append("   Your system is missing a conversion tool (ImageMagick).")
-                info_notes.append("   👉 Fix: Use File -> Export... -> JPG inside Inkscape,")
-                info_notes.append("           or convert your generated PNG into a JPEG.")
+                info_notes.append(
+                    "   Your system is missing a conversion tool (ImageMagick)."
+                )
+                info_notes.append(
+                    "   👉 Fix: Use File -> Export... -> JPG inside Inkscape,"
+                )
+                info_notes.append(
+                    "           or convert your generated PNG into a JPEG."
+                )
 
         # 6. Construct Clean Layout Dialog Report
         log_output = []
