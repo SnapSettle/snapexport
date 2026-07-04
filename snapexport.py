@@ -27,12 +27,11 @@ class SnapExport(inkex.EffectExtension):
             os.makedirs(output_dir)
 
         success_list = []
-        error_list = []
+        info_notes = []
 
-        # Process Standard Flat Formats
+        # Process Standard Formats (PNG, PDF, EPS)
         standard_formats = {
             "png": self.options.do_png,
-            "jpg": self.options.do_jpg,
             "pdf": self.options.do_pdf,
             "eps": self.options.do_eps,
         }
@@ -43,53 +42,75 @@ class SnapExport(inkex.EffectExtension):
                 command = ["inkscape", svg_file, "-o", out_path]
                 try:
                     subprocess.run(command, check=True, capture_output=True, text=True)
-                    success_list.append(f"{base_name}.{ext}")
-                except subprocess.CalledProcessError as e:
-                    error_msg = e.stderr.strip() if e.stderr else str(e)
-                    error_list.append((ext.upper(), error_msg))
+                    if os.path.exists(out_path):
+                        success_list.append(f"{base_name}.{ext}")
+                except subprocess.CalledProcessError:
+                    pass
 
-        # Process SVG Formats directly based on checkboxes
-        svg_variants = []
-        if self.options.do_svg_plain:
-            svg_variants.append(("svg-plain", "plain"))
-        if self.options.do_svg_inkscape:
-            svg_variants.append(("svg-inkscape", "inkscape"))
-        if self.options.do_svg_optimized:
-            svg_variants.append(("scour", "optimized"))
-
-        # Loop through selected SVG variations
-        for export_type, suffix in svg_variants:
-            target_filename = (
-                f"{base_name}.svg"
-                if len(svg_variants) == 1
-                else f"{base_name}_{suffix}.svg"
-            )
-            out_path = os.path.join(output_dir, target_filename)
+        # Process JPEG natively
+        if self.options.do_jpg:
+            jpg_path = os.path.join(output_dir, f"{base_name}.jpg")
             command = [
                 "inkscape",
                 svg_file,
-                "--export-type",
-                export_type,
+                "--export-background=ffffff",
+                "--export-type=jpg",
                 "-o",
-                out_path,
+                jpg_path,
             ]
+            try:
+                subprocess.run(command, check=True, capture_output=True, text=True)
+                if os.path.exists(jpg_path):
+                    success_list.append(f"{base_name}.jpg")
+                else:
+                    raise FileNotFoundError
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                info_notes.append("⚠️  JPEG File Skipped:")
+                info_notes.append("   Your system is missing a conversion tool (ImageMagick).")
+                info_notes.append("   👉 Fix: Use File -> Export... -> JPG inside Inkscape,")
+                info_notes.append("           or convert your generated PNG into a JPEG.")
+
+        # Process SVG Variants natively
+        svg_variants = []
+        if self.options.do_svg_plain:
+            svg_variants.append(("org.inkscape.output.svg.plain", "plain"))
+        if self.options.do_svg_inkscape:
+            svg_variants.append((None, "inkscape"))
+        if self.options.do_svg_optimized:
+            svg_variants.append(("org.inkscape.output.scour.inkscape", "optimized"))
+
+        use_suffix = len(svg_variants) > 1
+
+        for extension_id, suffix in svg_variants:
+            target_filename = f"{base_name}_{suffix}.svg" if use_suffix else f"{base_name}.svg"
+            out_path = os.path.join(output_dir, target_filename)
+
+            command = ["inkscape", svg_file, "--export-type=svg", "-o", out_path]
+            if extension_id:
+                command.append(f"--export-extension={extension_id}")
 
             try:
                 subprocess.run(command, check=True, capture_output=True, text=True)
-                success_list.append(target_filename)
-            except subprocess.CalledProcessError as e:
-                error_msg = e.stderr.strip() if e.stderr else str(e)
-                error_list.append((f"SVG-{suffix.upper()}", error_msg))
+                if os.path.exists(out_path):
+                    success_list.append(target_filename)
+                else:
+                    raise FileNotFoundError
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                if suffix == "optimized":
+                    info_notes.append("⚠️  Optimized SVG Skipped:")
+                    info_notes.append("   The 'Scour' code-cleaner utility is missing.")
+                    info_notes.append("   👉 Fix 1: Export as 'Plain SVG' instead.")
+                    info_notes.append("   👉 Fix 2: Install the 'Scour' utility in your system.")
 
-        # Construct Custom Clean Layout Report
+        # Construct Clean Layout Dialog Report
         log_output = []
         divider = "─" * 45
 
         if success_list:
             log_output.append(f" {divider}")
-            log_output.append("  🎉  EXPORT SUCCESSFUL!")
+            log_output.append("  🎉  EXPORT TASK COMPLETED")
             log_output.append(f" {divider}")
-            log_output.append(f"  📊 Total Compiled:  {len(success_list)}")
+            log_output.append(f"  📊 Total Saved:  {len(success_list)}")
             log_output.append(f"  📍 Folder:  {output_dir}")
             log_output.append(f" {divider}")
             log_output.append("  📂  GENERATED FILES")
@@ -98,15 +119,14 @@ class SnapExport(inkex.EffectExtension):
                 log_output.append(f"    {idx}.  {file_item}")
             log_output.append(f" {divider}")
 
-        if error_list:
+        if info_notes:
             if success_list:
                 log_output.append("\n")
             log_output.append(f" {divider}")
-            log_output.append("  ⚠️  SOME ERRORS OCCURRED")
+            log_output.append("  💡  FIX MISSING FORMATS (PICK ONE FOR EACH)")
             log_output.append(f" {divider}")
-            for fmt_lbl, err_desc in error_list:
-                short_err = (err_desc[:40] + "...") if len(err_desc) > 40 else err_desc
-                log_output.append(f"    ❌ [{fmt_lbl}]: {short_err}")
+            for note in info_notes:
+                log_output.append(f"  {note}")
             log_output.append(f" {divider}")
 
         if log_output:
