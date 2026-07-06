@@ -18,11 +18,15 @@ class SnapExport(inkex.EffectExtension):
 
         pars.add_argument("--do_pdf", type=inkex.Boolean, default=True)
         pars.add_argument("--do_eps", type=inkex.Boolean, default=True)
+        
+        # New Resolution Scaling parameter input argument link
+        pars.add_argument("--dpi_value", type=int, default=300)
 
     def effect(self):
         output_dir = os.path.expanduser(self.options.path)
         base_name = self.options.filename
         svg_file = self.options.input_file
+        chosen_dpi = str(self.options.dpi_value)
 
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -41,6 +45,11 @@ class SnapExport(inkex.EffectExtension):
             if checked:
                 out_path = os.path.join(output_dir, f"{base_name}.{ext}")
                 command = ["inkscape", svg_file, "-o", out_path]
+                
+                # Dynamically apply the user-specified configuration onto PNG targets
+                if ext == "png":
+                    command.append(f"--export-dpi={chosen_dpi}")
+                    
                 try:
                     subprocess.run(command, check=True, capture_output=True, text=True)
                     if os.path.exists(out_path):
@@ -157,12 +166,13 @@ class SnapExport(inkex.EffectExtension):
             jpg_path = os.path.join(output_dir, f"{base_name}.jpg")
             jpg_success = False
 
-            # Tier 1: Try Native Inkscape JPG Render Engine
+            # Tier 1: Try Native Inkscape JPG Render Engine utilizing custom scale parameters
             command = [
                 "inkscape",
                 svg_file,
                 "--export-background=ffffff",
                 "--export-type=jpg",
+                f"--export-dpi={chosen_dpi}",
                 "-o",
                 jpg_path,
             ]
@@ -179,12 +189,13 @@ class SnapExport(inkex.EffectExtension):
                 png_source = os.path.join(output_dir, f"{base_name}.png")
                 temp_png_created = False
 
-                # Ensure we have a high quality PNG to compress from
+                # Ensure we have a high quality PNG to compress from (with our target user custom DPI injected)
                 if not os.path.exists(png_source):
                     command = [
                         "inkscape",
                         svg_file,
                         "--export-background=ffffff",
+                        f"--export-dpi={chosen_dpi}",
                         "-o",
                         png_source,
                     ]
@@ -204,6 +215,7 @@ class SnapExport(inkex.EffectExtension):
                 )
 
                 if os.path.exists(png_source) and im_binary:
+                    # Note: ImageMagick handles conversion at the resolution specified in the source PNG asset natively
                     img_cmd = [
                         im_binary,
                         png_source,
@@ -243,7 +255,7 @@ class SnapExport(inkex.EffectExtension):
                     "           or convert your generated PNG into a JPEG."
                 )
 
-        # 6. Construct Clean Layout Dialog Report
+        # Construct Clean Layout Dialog Report
         log_output = []
         divider = "─" * 45
 

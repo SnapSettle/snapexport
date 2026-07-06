@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension" needs-live-preview="false">
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
     <name>SnapExport</name>
-    <id>org.snapsettle.export</id>
+    <id>org.snapsettle.snapexport</id>
     
-    <param name="path" type="path" mode="folder" gui-text="Select Output Directory:">/tmp/snapexport</param>
-    <param name="filename" type="string" gui-text="Base Filename:">illustration</param>
+    <param name="path" type="path" mode="folder" gui-text="Folder:">/tmp/snapexport</param>
+    <param name="filename" type="string" gui-text="Filename:">illustration</param>
     
     <separator/>
     <label>Select formats to export simultaneously:</label>
@@ -21,11 +21,21 @@
     <param name="do_pdf" type="bool" gui-text="PDF">true</param>
     <param name="do_eps" type="bool" gui-text="EPS">true</param>
 
+    <separator/>
+    <label font-weight="bold">Resolution Scaling (Raster Formats):</label>
+    <param name="dpi_value" type="int" min="1" max="2400" gui-text="Export DPI:">300</param>
+    <label>💡 Quick Reference Tips:</label>
+    <label>   • 96 DPI   ➔ Standard Screen / Low-Res Preview</label>
+    <label>   • 150 DPI ➔ Balanced Web Assets &amp; Digital Layouts</label>
+    <label>   • 300 DPI ➔ High-Quality Premium Print (Recommended)</label>
+    <label>   • 600 DPI ➔ Ultra Sharp / Large-Scale Signage banners</label>
+
     <effect>
         <object-type>all</object-type>
         <effects-menu>
             <submenu name="Export"/>
         </effects-menu>
+        <live-preview>false</live-preview>
     </effect>
     <script>
         <command location="inx" interpreter="python">snapexport.py</command>
