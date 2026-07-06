@@ -6,7 +6,9 @@ import inkex
 
 class SnapExport(inkex.EffectExtension):
     def add_arguments(self, pars):
-        pars.add_argument("--path", type=str, default="/tmp/snapexport")
+        pars.add_argument("--export_tabs", type=str, default="tab_main")
+
+        pars.add_argument("--path", type=str, default="")
         pars.add_argument("--filename", type=str, default="illustration")
         pars.add_argument("--do_png", type=inkex.Boolean, default=True)
         pars.add_argument("--do_jpg", type=inkex.Boolean, default=True)
@@ -18,16 +20,27 @@ class SnapExport(inkex.EffectExtension):
 
         pars.add_argument("--do_pdf", type=inkex.Boolean, default=True)
         pars.add_argument("--do_eps", type=inkex.Boolean, default=True)
-        
+
         # New Resolution Scaling parameter input argument link
         pars.add_argument("--dpi_value", type=int, default=300)
 
     def effect(self):
-        output_dir = os.path.expanduser(self.options.path)
+        import tempfile
+
+        # Grab raw strings from UI
+        raw_path = self.options.path
         base_name = self.options.filename
         svg_file = self.options.input_file
         chosen_dpi = str(self.options.dpi_value)
 
+        # Clean and handle empty default path checks safely on any OS
+        if not raw_path or raw_path.strip() == "":
+            # Automatically detects /tmp on Linux/Mac, AppData/Local/Temp on Windows
+            output_dir = os.path.join(tempfile.gettempdir(), "snapexport")
+        else:
+            output_dir = os.path.expanduser(raw_path.strip())
+
+        # Establish directory path layers safely
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -45,11 +58,11 @@ class SnapExport(inkex.EffectExtension):
             if checked:
                 out_path = os.path.join(output_dir, f"{base_name}.{ext}")
                 command = ["inkscape", svg_file, "-o", out_path]
-                
+
                 # Dynamically apply the user-specified configuration onto PNG targets
                 if ext == "png":
                     command.append(f"--export-dpi={chosen_dpi}")
-                    
+
                 try:
                     subprocess.run(command, check=True, capture_output=True, text=True)
                     if os.path.exists(out_path):

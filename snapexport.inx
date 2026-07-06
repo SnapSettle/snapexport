@@ -2,40 +2,75 @@
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
     <name>SnapExport</name>
     <id>org.snapsettle.snapexport</id>
-    
-    <param name="path" type="path" mode="folder" gui-text="Folder:">/tmp/snapexport</param>
-    <param name="filename" type="string" gui-text="Filename:">illustration</param>
-    
-    <separator/>
-    <label>Select formats to export simultaneously:</label>
-    
-    <label font-weight="bold">SVG Options:</label>
-    <param name="do_svg_plain" type="bool" gui-text="➔ Plain SVG">false</param>
-    <param name="do_svg_inkscape" type="bool" gui-text="➔ Inkscape SVG">false</param>
-    <param name="do_svg_optimized" type="bool" gui-text="➔ Optimized SVG">true</param>
-   
-    <separator/>
-    <label font-weight="bold">Other Formats:</label>
-    <param name="do_png" type="bool" gui-text="PNG">true</param>
-    <param name="do_jpg" type="bool" gui-text="JPEG">true</param>
-    <param name="do_pdf" type="bool" gui-text="PDF">true</param>
-    <param name="do_eps" type="bool" gui-text="EPS">true</param>
 
-    <separator/>
-    <label font-weight="bold">Resolution Scaling (Raster Formats):</label>
-    <param name="dpi_value" type="int" min="1" max="2400" gui-text="Export DPI:">300</param>
-    <label>💡 Quick Reference Tips:</label>
-    <label>   • 96 DPI   ➔ Standard Screen / Low-Res Preview</label>
-    <label>   • 150 DPI ➔ Balanced Web Assets &amp; Digital Layouts</label>
-    <label>   • 300 DPI ➔ High-Quality Premium Print (Recommended)</label>
-    <label>   • 600 DPI ➔ Ultra Sharp / Large-Scale Signage banners</label>
+    <param name="export_tabs" type="notebook">
+        
+        <page name="tab_main" gui-text="📁 Output">
+            <vbox>
+                <label appearance="header">Output Settings Configuration:</label>
+                
+                <separator/>
 
-    <effect>
+                <param name="filename" type="string" gui-text="🏷️ Filename:" gui-description="Enter the base filename prefix. The chosen format extensions will be appended automatically to this name.">illustration</param>
+                <label appearance="description">Tip: The filename is used as a prefix and selected formats are appended to it.</label>
+                <separator/>
+
+                <param name="path" type="path" mode="folder" gui-text="📂 Destination:" gui-description="Select the directory where all exported files will be saved. If left blank, files will save to a temporary system folder."></param>
+                <label appearance="description">Tip: Files will be saved to the selected directory, appended text will be used as sub-folder and will be created if required.</label>
+            </vbox>
+        </page>
+
+        <page name="tab_formats" gui-text="⚙️ Formats">
+            <vbox>
+                <label appearance="header">Select Formats to Export Natively:</label>
+                <separator/>
+                <hbox>
+                    <vbox>
+                        <label appearance="header">📐 Vectors (SVG)</label>
+                        <param name="do_svg_plain" type="bool" gui-text="Plain" gui-description="Export a clean, standardized W3C SVG file with all Inkscape-specific metadata and editor layers removed.">false</param>
+                        <param name="do_svg_inkscape" type="bool" gui-text="Inkscape" gui-description="Export a complete copy of the working Inkscape SVG, preserving editable layers, guides, and project history.">false</param>
+                        <param name="do_svg_optimized" type="bool" gui-text="Optimized" gui-description="Export a highly compressed SVG using the Scour layout utility to strip redundant instructions for optimal web use.">true</param>
+                    </vbox>
+
+                    <vbox>
+                    <label appearance="header">🖼️ Images</label>
+                        <param name="do_png" type="bool" gui-text="PNG" gui-description="Export a high-quality, lossless raster image that supports transparent backgrounds. Resolution scales with Target DPI.">true</param>
+                        <param name="do_jpg" type="bool" gui-text="JPEG" gui-description="Export a compressed raster image with a solid white background layer. Resolution scales with Target DPI.">true</param>
+                    </vbox>
+
+                    <vbox>
+                    <label appearance="header">📄 Documents</label>
+                        <param name="do_pdf" type="bool" gui-text="PDF" gui-description="Export a highly compatible, vector-based Portable Document Format file ideal for viewing, printing, and sharing.">true</param>
+                        <param name="do_eps" type="bool" gui-text="EPS" gui-description="Export an Encapsulated PostScript vector file, commonly used in traditional layout publishing and legacy commercial printing.">true</param>
+                    </vbox>
+                </hbox>
+            </vbox>
+        </page>
+
+        <page name="tab_dpi" gui-text="⚡ Resolution">
+            <vbox>
+                <label appearance="header">Raster Image Density Configuration:</label>
+                <separator/>
+                
+                <param name="dpi_value" appearance="header" type="int" min="1" max="2400" gui-text="🎯 Target Density (DPI):" gui-description="Adjust resolution thickness for PNG and JPEG formats. Higher values create sharper graphics but result in larger file sizes.">300</param>
+                <label appearance="description">Tip: Controls image crispness. Use higher values for print and lower values for web or screen use.</label>
+                <separator/>
+
+                <label appearance="header">💡 Quick Reference Guide:</label>
+                <label>• 96 DPI ➔ Standard Display / Fast Preview</label>
+                <label>• 150 DPI ➔ Balanced Web Layout Assets</label>
+                <label>• 300 DPI ➔ Premium Quality Print (Recommended)</label>
+                <label>• 600 DPI ➔ Ultra-Sharp Large Scale Signage</label>
+            </vbox>
+        </page>
+
+    </param>
+
+    <effect needs-live-preview="false">
         <object-type>all</object-type>
         <effects-menu>
             <submenu name="Export"/>
         </effects-menu>
-        <live-preview>false</live-preview>
     </effect>
     <script>
         <command location="inx" interpreter="python">snapexport.py</command>
